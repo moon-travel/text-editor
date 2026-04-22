@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>英語学習エディタ</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        margin: 0;
+        padding: 20px;
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background-color: #f5f5f5;
+    }
+    .toolbar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    button {
+        padding: 6px 12px;
+        font-size: 14px;
+        cursor: pointer;
+        background-color: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    button:hover {
+        background-color: #e9e9e9;
+    }
+    input[type="text"] {
+        padding: 6px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        width: 120px;
+    }
+    .editor-container {
+        display: flex;
+        flex-grow: 1;
+        border: 1px solid #ccc;
+        background: #fff;
+        overflow: hidden;
+        margin-bottom: 15px;
+        border-radius: 4px;
+    }
+    #line-numbers {
+        width: 50px;
+        background: #eee;
+        color: #888;
+        text-align: right;
+        padding: 10px 5px;
+        font-family: monospace;
+        font-size: 16px;
+        line-height: 1.5;
+        overflow: hidden;
+        user-select: none;
+        border-right: 1px solid #ccc;
+    }
+    .text-area-wrapper {
+        position: relative;
+        flex-grow: 1;
+    }
+    #highlight-overlay, #editor {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 16px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-all;
+        overflow-y: auto;
+        overflow-x: hidden;
+        margin: 0;
+        border: none;
+        outline: none;
+    }
+    #highlight-overlay {
+        z-index: 1;
+        color: transparent;
+        pointer-events: none;
+        background: transparent;
+    }
+    #highlight-overlay mark {
+        background-color: #ffd700;
+        color: transparent;
+    }
+    #editor {
+        z-index: 2;
+        background: transparent;
+        color: #333;
+        caret-color: #000;
+    }
+    .ai-results {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        height: 35%;
+        border-top: 2px solid #ccc;
+        padding-top: 15px;
+    }
+    .result-box {
+        flex-grow: 1;
+        border: 1px solid #ccc;
+        background: #fff;
+        padding: 10px;
+        overflow-y: auto;
+        border-radius: 4px;
+    }
+    .result-title {
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #222;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+    }
+    .result-content {
+        font-size: 14px;
+        color: #444;
+        white-space: pre-wrap;
+    }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+    <button id="btn-new">New</button>
+    <button id="btn-save">Save</button>
+    <button id="btn-load">Load</button>
+    <input type="file" id="file-input" accept=".txt" style="display: none;">
+    <button id="btn-undo">Undo</button>
+    <button id="btn-redo">Redo</button>
+    <input type="text" id="input-search" placeholder="検索文字列">
+    <button id="btn-search">Search</button>
+    <input type="text" id="input-replace" placeholder="置換文字列">
+    <button id="btn-replace">Replace</button>
+    <button id="btn-check">Check English</button>
+</div>
+
+<div class="editor-container">
+    <div id="line-numbers">1</div>
+    <div class="text-area-wrapper">
+        <div id="highlight-overlay"></div>
+        <div id="editor" contenteditable="true"></div>
+    </div>
+</div>
+
+<div class="ai-results">
+    <div class="result-box">
+        <div class="result-title">修正文 (Corrected)</div>
+        <div id="corrected-output" class="result-content"></div>
+    </div>
+    <div class="result-box">
+        <div class="result-title">理由 (Explanation)</div>
+        <div id="explanation-output" class="result-content"></div>
+    </div>
+</div>
+
+<script>
+    const editor = document.getElementById('editor');
+    const highlightOverlay = document.getElementById('highlight-overlay');
+    const lineNumbers = document.getElementById('line-numbers');
+    const inputSearch = document.getElementById('input-search');
+    const inputReplace = document.getElementById('input-replace');
+    const correctedOutput = document.getElementById('corrected-output');
+    const explanationOutput = document.getElementById('explanation-output');
+
+    let historyList = [];
+    let historyIdx = -1;
+    let debounceTimer;
+
+    // 行番号の更新処理
+    function updateLines() {
+        const text = editor.innerText;
+        const lines = text.split('\n').length;
+        let numbersHtml = '';
+        for (let i = 1; i <= lines; i++) {
+            numbersHtml += i + '<br>';
+        }
+        lineNumbers.innerHTML = numbersHtml;
+    }
+
+    // 検索ハイライトの更新処理
+    function updateHighlight() {
+        const kw = inputSearch.value;
+        const text = editor.innerText;
+        highlightOverlay.innerHTML = '';
+        
+        if (!kw) {
+            highlightOverlay.textContent = text;
+            return;
+        }
+        
+        const parts = text.split(kw);
+        parts.forEach((part, index) => {
+            highlightOverlay.appendChild(document.createTextNode(part));
+            if (index < parts.length - 1) {
+                const mark = document.createElement('mark');
+                mark.textContent = kw;
+                highlightOverlay.appendChild(mark);
+            }
+        });
+    }
+
+    // 履歴保存処理（最大50件）
+    function saveState() {
+        const currentText = editor.innerText;
+        if (historyIdx >= 0 && historyList[historyIdx] === currentText) return;
+        
+        historyList = historyList.slice(0, historyIdx + 1);
+        historyList.push(currentText);
+        
+        if (historyList.length > 50) {
+            historyList.shift();
+        }
+        historyIdx = historyList.length - 1;
+    }
+
+    function triggerSaveState() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(saveState, 500);
+    }
+
+    // スクロール同期処理
+    editor.addEventListener('scroll', () => {
+        highlightOverlay.scrollTop = editor.scrollTop;
+        highlightOverlay.scrollLeft = editor.scrollLeft;
+        lineNumbers.scrollTop = editor.scrollTop;
+    });
+
+    // 入力イベント検知
+    editor.addEventListener('input', () => {
+        updateLines();
+        updateHighlight();
+        triggerSaveState();
+    });
+
+    // ペースト時のプレーンテキスト化処理
+    editor.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
+    });
+
+    // 各種ボタンのイベントリスナー
+    document.getElementById('btn-new').addEventListener('click', () => {
+        editor.innerText = '';
+        updateLines();
+        updateHighlight();
+        saveState();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+        const text = editor.innerText;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'document.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    const fileInput = document.getElementById('file-input');
+    document.getElementById('btn-load').addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            editor.innerText = event.target.result;
+            updateLines();
+            updateHighlight();
+            saveState();
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    });
+
+    document.getElementById('btn-undo').addEventListener('click', () => {
+        if (historyIdx > 0) {
+            historyIdx--;
+            editor.innerText = historyList[historyIdx];
+            updateLines();
+            updateHighlight();
+        }
+    });
+
+    document.getElementById('btn-redo').addEventListener('click', () => {
+        if (historyIdx < historyList.length - 1) {
+            historyIdx++;
+            editor.innerText = historyList[historyIdx];
+            updateLines();
+            updateHighlight();
+        }
+    });
+
+    document.getElementById('btn-search').addEventListener('click', updateHighlight);
+
+    document.getElementById('btn-replace').addEventListener('click', () => {
+        const kw = inputSearch.value;
+        const rep = inputReplace.value;
+        if (!kw) return;
+        
+        const text = editor.innerText;
+        if (text.includes(kw)) {
+            editor.innerText = text.split(kw).join(rep);
+            updateLines();
+            updateHighlight();
+            saveState();
+        }
+    });
+
+    // AI機能呼び出しと結果パース処理
+    document.getElementById('btn-check').addEventListener('click', async () => {
+        const text = editor.innerText.trim();
+        if (!text) return;
+        
+        correctedOutput.innerText = '通信中...';
+        explanationOutput.innerText = '';
+        
+        try {
+            const response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: "gemma4:e4b",
+                    prompt: "必ず日本語で説明しなさい。次の英文を中学生レベルに修正し、理由を日本語で説明:\n\n" + text,
+                    stream: false
+                })
+            });
+            
+            if (!response.ok) throw new Error('通信に失敗しました');
+            
+            const data = await response.json();
+            const aiResponse = data.response || '';
+            
+            const match = aiResponse.match(/Corrected:\s*([\s\S]*?)Explanation:\s*([\s\S]*)/i);
+            
+            if (match) {
+                correctedOutput.innerText = match[1].trim();
+                explanationOutput.innerText = match[2].trim();
+            } else {
+                correctedOutput.innerText = '形式の解析に失敗しました';
+                explanationOutput.innerText = aiResponse;
+            }
+        } catch (err) {
+            correctedOutput.innerText = 'エラーが発生しました';
+            explanationOutput.innerText = err.message;
+        }
+    });
+
+    // 初期状態の保存
+    saveState();
+    updateLines();
+
+</script>
+</body>
+</html>
