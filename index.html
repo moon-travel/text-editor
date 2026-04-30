@@ -1,370 +1,584 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>英語学習エディタ</title>
-<style>
-    * {
-        box-sizing: border-box;
-    }
-    body {
-        margin: 0;
-        padding: 20px;
-        font-family: sans-serif;
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        background-color: #f5f5f5;
-    }
-    .toolbar {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-    button {
-        padding: 6px 12px;
-        font-size: 14px;
-        cursor: pointer;
-        background-color: #fff;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-    }
-    button:hover {
-        background-color: #e9e9e9;
-    }
-    input[type="text"] {
-        padding: 6px;
-        font-size: 14px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        width: 120px;
-    }
-    .editor-container {
-        display: flex;
-        flex-grow: 1;
-        border: 1px solid #ccc;
-        background: #fff;
-        overflow: hidden;
-        margin-bottom: 15px;
-        border-radius: 4px;
-    }
-    #line-numbers {
-        width: 50px;
-        background: #eee;
-        color: #888;
-        text-align: right;
-        padding: 10px 5px;
-        font-family: monospace;
-        font-size: 16px;
-        line-height: 1.5;
-        overflow: hidden;
-        user-select: none;
-        border-right: 1px solid #ccc;
-    }
-    .text-area-wrapper {
-        position: relative;
-        flex-grow: 1;
-    }
-    #highlight-overlay, #editor {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        padding: 10px;
-        font-family: monospace;
-        font-size: 16px;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        word-break: break-all;
-        overflow-y: auto;
-        overflow-x: hidden;
-        margin: 0;
-        border: none;
-        outline: none;
-    }
-    #highlight-overlay {
-        z-index: 1;
-        color: transparent;
-        pointer-events: none;
-        background: transparent;
-    }
-    #highlight-overlay mark {
-        background-color: #ffd700;
-        color: transparent;
-    }
-    #editor {
-        z-index: 2;
-        background: transparent;
-        color: #333;
-        caret-color: #000;
-    }
-    .ai-results {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        height: 35%;
-        border-top: 2px solid #ccc;
-        padding-top: 15px;
-    }
-    .result-box {
-        flex-grow: 1;
-        border: 1px solid #ccc;
-        background: #fff;
-        padding: 10px;
-        overflow-y: auto;
-        border-radius: 4px;
-    }
-    .result-title {
-        font-weight: bold;
-        margin-bottom: 8px;
-        color: #222;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
-    }
-    .result-content {
-        font-size: 14px;
-        color: #444;
-        white-space: pre-wrap;
-    }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Learning Text Editor</title>
+    <style>
+        /* =========================================
+           基本レイアウト・リセット
+        ========================================= */
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+
+        /* =========================================
+           ツールバー (Toolbar)
+        ========================================= */
+        .toolbar {
+            background-color: #2c3e50;
+            padding: 10px 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .toolbar button, .toolbar input {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .toolbar input {
+            outline: none;
+        }
+
+        .toolbar button {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .toolbar button:hover {
+            background-color: #bdc3c7;
+        }
+
+        .toolbar button.primary {
+            background-color: #e74c3c;
+            color: #fff;
+            margin-left: auto; /* Checkボタンを右端に寄せる */
+        }
+
+        .toolbar button.primary:hover {
+            background-color: #c0392b;
+        }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background-color: #7f8c8d;
+            margin: 0 5px;
+        }
+
+        /* =========================================
+           メインコンテンツ領域
+        ========================================= */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* --- エディタ領域 --- */
+        .editor-section {
+            flex: 1;
+            display: flex;
+            background: #fff;
+            border-right: 1px solid #ddd;
+        }
+
+        .line-numbers {
+            width: 40px;
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+            text-align: right;
+            padding: 15px 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            line-height: 1.5;
+            overflow: hidden;
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        .editor-wrapper {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 背景(ハイライト用)とテキストエリアを完全に重ねる */
+        .backdrop, #editor {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            line-height: 1.5;
+            padding: 15px;
+            box-sizing: border-box;
+            margin: 0;
+            border: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .backdrop {
+            z-index: 1;
+            overflow: auto;
+            color: transparent; /* テキスト自体は透明にし、ハイライト背景だけを見せる */
+            pointer-events: none;
+        }
+
+        #editor {
+            z-index: 2;
+            background: transparent;
+            color: #333;
+            resize: none;
+            outline: none;
+        }
+
+        /* ハイライトのスタイル */
+        mark.search-highlight {
+            background-color: #ffeaa7;
+            color: transparent;
+        }
+
+        mark.ai-highlight {
+            background-color: #ff7675;
+            color: transparent;
+        }
+
+        /* --- AI添削結果領域 (右側サイドバー) --- */
+        .ai-sidebar {
+            width: 350px;
+            background-color: #fafafa;
+            padding: 20px;
+            overflow-y: auto;
+            box-sizing: border-box;
+            box-shadow: inset 2px 0 5px rgba(0,0,0,0.05);
+        }
+
+        .ai-sidebar h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .ai-result-box {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+
+        .result-label {
+            font-weight: bold;
+            color: #7f8c8d;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            margin-top: 10px;
+        }
+        .result-label:first-child { margin-top: 0; }
+
+        .result-text {
+            color: #333;
+            font-family: 'Courier New', Courier, monospace;
+            background: #fdfdfd;
+            padding: 8px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .explanation {
+            background-color: #e8f4f8;
+            padding: 10px;
+            border-left: 4px solid #3498db;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #2c3e50;
+            margin-top: 5px;
+        }
+
+        .loading {
+            display: none;
+            color: #3498db;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        #btnApply {
+            width: 100%;
+            background-color: #27ae60;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #btnApply:hover { background-color: #2ecc71; }
+    </style>
 </head>
 <body>
 
-<div class="toolbar">
-    <button id="btn-new">New</button>
-    <button id="btn-save">Save</button>
-    <button id="btn-load">Load</button>
-    <input type="file" id="file-input" accept=".txt" style="display: none;">
-    <button id="btn-undo">Undo</button>
-    <button id="btn-redo">Redo</button>
-    <input type="text" id="input-search" placeholder="検索文字列">
-    <button id="btn-search">Search</button>
-    <input type="text" id="input-replace" placeholder="置換文字列">
-    <button id="btn-replace">Replace</button>
-    <button id="btn-check">Check English</button>
-</div>
-
-<div class="editor-container">
-    <div id="line-numbers">1</div>
-    <div class="text-area-wrapper">
-        <div id="highlight-overlay"></div>
-        <div id="editor" contenteditable="true"></div>
-    </div>
-</div>
-
-<div class="ai-results">
-    <div class="result-box">
-        <div class="result-title">修正文 (Corrected)</div>
-        <div id="corrected-output" class="result-content"></div>
-    </div>
-    <div class="result-box">
-        <div class="result-title">理由 (Explanation)</div>
-        <div id="explanation-output" class="result-content"></div>
-    </div>
-</div>
-
-<script>
-    const editor = document.getElementById('editor');
-    const highlightOverlay = document.getElementById('highlight-overlay');
-    const lineNumbers = document.getElementById('line-numbers');
-    const inputSearch = document.getElementById('input-search');
-    const inputReplace = document.getElementById('input-replace');
-    const correctedOutput = document.getElementById('corrected-output');
-    const explanationOutput = document.getElementById('explanation-output');
-
-    let historyList = [];
-    let historyIdx = -1;
-    let debounceTimer;
-
-    // 行番号の更新処理
-    function updateLines() {
-        const text = editor.innerText;
-        const lines = text.split('\n').length;
-        let numbersHtml = '';
-        for (let i = 1; i <= lines; i++) {
-            numbersHtml += i + '<br>';
-        }
-        lineNumbers.innerHTML = numbersHtml;
-    }
-
-    // 検索ハイライトの更新処理
-    function updateHighlight() {
-        const kw = inputSearch.value;
-        const text = editor.innerText;
-        highlightOverlay.innerHTML = '';
+    <div class="toolbar">
+        <button id="btnNew" title="Create New File">New</button>
+        <button id="btnSave" title="Save as .txt">Save</button>
+        <button id="btnLoad" title="Load .txt file">Load</button>
+        <input type="file" id="fileInput" style="display:none;" accept=".txt">
         
-        if (!kw) {
-            highlightOverlay.textContent = text;
-            return;
-        }
+        <div class="divider"></div>
         
-        const parts = text.split(kw);
-        parts.forEach((part, index) => {
-            highlightOverlay.appendChild(document.createTextNode(part));
-            if (index < parts.length - 1) {
-                const mark = document.createElement('mark');
-                mark.textContent = kw;
-                highlightOverlay.appendChild(mark);
+        <button id="btnUndo" title="Undo">Undo</button>
+        <button id="btnRedo" title="Redo">Redo</button>
+        
+        <div class="divider"></div>
+        
+        <input type="text" id="searchInput" placeholder="Search...">
+        <button id="btnSearch">Search</button> 
+        
+        <input type="text" id="replaceInput" placeholder="Replace with...">
+        <button id="btnReplace">Replace</button>
+        
+        <button id="btnCheck" class="primary" title="Check and Correct English">Check English</button>
+    </div>
+
+    <div class="main-container">
+        
+        <div class="editor-section">
+            <div class="line-numbers" id="lineNumbers">1</div>
+            <div class="editor-wrapper">
+                <div class="backdrop" id="backdrop">
+                    <div class="highlights" id="highlights"></div>
+                </div>
+                <textarea id="editor" spellcheck="false" placeholder="Write your English sentences here..."></textarea>
+            </div>
+        </div>
+
+        <div class="ai-sidebar">
+            <h3>Correction Result</h3>
+            
+            <div id="loading" class="loading">AI is analyzing your text...</div>
+            
+            <div id="aiPlaceholder">
+                <p style="color:#7f8c8d; font-size:14px;">Press the <strong>"Check English"</strong> button to get suggestions for simpler and more natural English.</p>
+            </div>
+            
+            <div id="aiContent" style="display: none;">
+                <div class="ai-result-box">
+                    <div class="result-label">Original Sentence</div>
+                    <div class="result-text" id="origText"></div>
+                    
+                    <div class="result-label">Corrected (Simple & Natural)</div>
+                    <div class="result-text" id="corrText"></div>
+                    
+                    <div class="result-label">Explanation</div>
+                    <div class="explanation" id="expText"></div>
+                </div>
+                <button id="btnApply">Apply Correction</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const editor = document.getElementById("editor");
+        const backdrop = document.getElementById("backdrop");
+        const highlights = document.getElementById("highlights");
+        const lineNumbers = document.getElementById("lineNumbers");
+        const searchInput = document.getElementById("searchInput");
+
+        let aiHighlightWords = []; // AIによって修正された単語のリスト
+
+        // =========================================
+        // 1. Undo / Redo の履歴管理機能
+        // =========================================
+        let historyStack = [];
+        let historyIndex = -1;
+        let typingTimer;
+
+        function saveHistory() {
+            const val = editor.value;
+            // 変化がない場合は保存しない
+            if (historyIndex >= 0 && historyStack[historyIndex] === val) return;
+            
+            // 過去の履歴に戻った状態で新しく入力した場合、未来の履歴を削除
+            historyStack = historyStack.slice(0, historyIndex + 1);
+            historyStack.push(val);
+            historyIndex++;
+        }
+
+        function resetHistory() {
+            historyStack = [editor.value];
+            historyIndex = 0;
+        }
+
+        document.getElementById("btnUndo").addEventListener("click", () => {
+            if (historyIndex > 0) {
+                historyIndex--;
+                editor.value = historyStack[historyIndex];
+                updateView();
             }
         });
-    }
 
-    // 履歴保存処理（最大50件）
-    function saveState() {
-        const currentText = editor.innerText;
-        if (historyIdx >= 0 && historyList[historyIdx] === currentText) return;
-        
-        historyList = historyList.slice(0, historyIdx + 1);
-        historyList.push(currentText);
-        
-        if (historyList.length > 50) {
-            historyList.shift();
-        }
-        historyIdx = historyList.length - 1;
-    }
-
-    function triggerSaveState() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(saveState, 500);
-    }
-
-    // スクロール同期処理
-    editor.addEventListener('scroll', () => {
-        highlightOverlay.scrollTop = editor.scrollTop;
-        highlightOverlay.scrollLeft = editor.scrollLeft;
-        lineNumbers.scrollTop = editor.scrollTop;
-    });
-
-    // 入力イベント検知
-    editor.addEventListener('input', () => {
-        updateLines();
-        updateHighlight();
-        triggerSaveState();
-    });
-
-    // ペースト時のプレーンテキスト化処理
-    editor.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const text = (e.originalEvent || e).clipboardData.getData('text/plain');
-        document.execCommand('insertText', false, text);
-    });
-
-    // 各種ボタンのイベントリスナー
-    document.getElementById('btn-new').addEventListener('click', () => {
-        editor.innerText = '';
-        updateLines();
-        updateHighlight();
-        saveState();
-    });
-
-    document.getElementById('btn-save').addEventListener('click', () => {
-        const text = editor.innerText;
-        const blob = new Blob([text], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'document.txt';
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    const fileInput = document.getElementById('file-input');
-    document.getElementById('btn-load').addEventListener('click', () => fileInput.click());
-    
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            editor.innerText = event.target.result;
-            updateLines();
-            updateHighlight();
-            saveState();
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    });
-
-    document.getElementById('btn-undo').addEventListener('click', () => {
-        if (historyIdx > 0) {
-            historyIdx--;
-            editor.innerText = historyList[historyIdx];
-            updateLines();
-            updateHighlight();
-        }
-    });
-
-    document.getElementById('btn-redo').addEventListener('click', () => {
-        if (historyIdx < historyList.length - 1) {
-            historyIdx++;
-            editor.innerText = historyList[historyIdx];
-            updateLines();
-            updateHighlight();
-        }
-    });
-
-    document.getElementById('btn-search').addEventListener('click', updateHighlight);
-
-    document.getElementById('btn-replace').addEventListener('click', () => {
-        const kw = inputSearch.value;
-        const rep = inputReplace.value;
-        if (!kw) return;
-        
-        const text = editor.innerText;
-        if (text.includes(kw)) {
-            editor.innerText = text.split(kw).join(rep);
-            updateLines();
-            updateHighlight();
-            saveState();
-        }
-    });
-
-    // AI機能呼び出しと結果パース処理
-    document.getElementById('btn-check').addEventListener('click', async () => {
-        const text = editor.innerText.trim();
-        if (!text) return;
-        
-        correctedOutput.innerText = '通信中...';
-        explanationOutput.innerText = '';
-        
-        try {
-            const response = await fetch('http://localhost:11434/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: "gemma4:e4b",
-                    prompt: "必ず日本語で説明しなさい。次の英文を中学生レベルに修正し、理由を日本語で説明:\n\n" + text,
-                    stream: false
-                })
-            });
-            
-            if (!response.ok) throw new Error('通信に失敗しました');
-            
-            const data = await response.json();
-            const aiResponse = data.response || '';
-            
-            const match = aiResponse.match(/Corrected:\s*([\s\S]*?)Explanation:\s*([\s\S]*)/i);
-            
-            if (match) {
-                correctedOutput.innerText = match[1].trim();
-                explanationOutput.innerText = match[2].trim();
-            } else {
-                correctedOutput.innerText = '形式の解析に失敗しました';
-                explanationOutput.innerText = aiResponse;
+        document.getElementById("btnRedo").addEventListener("click", () => {
+            if (historyIndex < historyStack.length - 1) {
+                historyIndex++;
+                editor.value = historyStack[historyIndex];
+                updateView();
             }
-        } catch (err) {
-            correctedOutput.innerText = 'エラーが発生しました';
-            explanationOutput.innerText = err.message;
+        });
+
+        // =========================================
+        // 2. エディタの表示更新・同期機能
+        // =========================================
+        function updateView() {
+            updateLineNumbers();
+            applyHighlights();
         }
-    });
 
-    // 初期状態の保存
-    saveState();
-    updateLines();
+        function updateLineNumbers() {
+            const lines = editor.value.split('\n').length;
+            // 行数分の数値を生成して <br> でつなぐ
+            const numbers = Array.from({ length: lines || 1 }, (_, i) => i + 1).join('<br>');
+            lineNumbers.innerHTML = numbers;
+        }
 
-</script>
+        // 正規表現のエスケープ用ユーティリティ
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function applyHighlights() {
+            let text = editor.value;
+            
+            // HTMLタグとして解釈されないようにエスケープ処理
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            // ① AIによるハイライト処理
+            if (aiHighlightWords.length > 0) {
+                aiHighlightWords.forEach(word => {
+                    if(!word) return;
+                    const escaped = escapeRegExp(word.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+                    // HTMLタグの中身を置換しないための正規表現 (?![^<]*>) を使用
+                    const regex = new RegExp(`(${escaped})(?![^<]*>)`, 'gi');
+                    text = text.replace(regex, '<mark class="ai-highlight">$1</mark>');
+                });
+            }
+
+            // ② 検索のハイライト処理
+            const searchTerm = searchInput.value;
+            if (searchTerm) {
+                const escaped = escapeRegExp(searchTerm.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+                const regex = new RegExp(`(${escaped})(?![^<]*>)`, 'gi');
+                text = text.replace(regex, '<mark class="search-highlight">$1</mark>');
+            }
+            
+            // 末尾の改行が省略されるのを防ぐためのハック
+            text += '\n';
+            highlights.innerHTML = text;
+        }
+
+        // 入力時のイベント
+        editor.addEventListener("input", () => {
+            updateView();
+            // タイピング終了後500msで履歴を保存（デバウンス処理）
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(saveHistory, 500);
+            
+            // テキストが変更されたらAIのハイライトはリセットする
+            if(aiHighlightWords.length > 0){
+                aiHighlightWords = [];
+                applyHighlights();
+            }
+        });
+
+        // スクロール同期 (テキストエリア、ハイライト背景、行番号)
+        editor.addEventListener("scroll", () => {
+            backdrop.scrollTop = editor.scrollTop;
+            backdrop.scrollLeft = editor.scrollLeft;
+            lineNumbers.scrollTop = editor.scrollTop;
+        });
+
+        // 検索枠入力時のリアルタイムハイライト
+        searchInput.addEventListener("input", applyHighlights);
+        document.getElementById("btnSearch").addEventListener("click", applyHighlights);
+
+        // =========================================
+        // 3. ファイル操作・置換・新規作成機能
+        // =========================================
+        
+        // New
+        document.getElementById("btnNew").addEventListener("click", () => {
+            if(confirm("Are you sure you want to clear the editor?")) {
+                editor.value = "";
+                aiHighlightWords = [];
+                resetHistory();
+                updateView();
+            }
+        });
+
+        // Save
+        document.getElementById("btnSave").addEventListener("click", () => {
+            const text = editor.value;
+            const blob = new Blob([text], { type: "text/plain" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "my_english_text.txt";
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
+
+        // Load
+        document.getElementById("btnLoad").addEventListener("click", () => {
+            document.getElementById("fileInput").click();
+        });
+
+        document.getElementById("fileInput").addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                editor.value = evt.target.result;
+                aiHighlightWords = [];
+                resetHistory();
+                updateView();
+            };
+            reader.readAsText(file);
+            // 同じファイルを再度読み込めるように値をリセット
+            e.target.value = ''; 
+        });
+
+        // Replace
+        document.getElementById("btnReplace").addEventListener("click", () => {
+            const searchVal = searchInput.value;
+            const replaceVal = document.getElementById("replaceInput").value;
+            if (searchVal) {
+                const regex = new RegExp(escapeRegExp(searchVal), 'gi');
+                editor.value = editor.value.replace(regex, replaceVal);
+                saveHistory();
+                updateView();
+            }
+        });
+
+        // =========================================
+        // 4. AI 英文添削機能 (メイン機能)
+        // =========================================
+        
+        // 【ダミーAPI関数】
+        // 後から実際のAPI（OpenAIやDeepL等）に置き換えられる構造です
+        async function fetchAICorrectionAPI(text) {
+            // サーバー通信をシミュレート (1秒待機)
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            let corrected = text;
+            let explanations = [];
+            let highlights = [];
+
+            // 中学生レベルの簡単で自然な英語にするダミールール
+            const rules = [
+                { bad: "difficult", good: "hard", exp: "Changed 'difficult' to 'hard' because it is simpler." },
+                { bad: "utilize", good: "use", exp: "'Use' is much more natural and simple than 'utilize'." },
+                { bad: "I is", good: "I am", exp: "The correct BE verb for 'I' is 'am'." },
+                { bad: "purchase", good: "buy", exp: "'Buy' is easier to understand." }
+            ];
+
+            rules.forEach(rule => {
+                const regex = new RegExp(`\\b${rule.bad}\\b`, 'gi');
+                if (regex.test(corrected)) {
+                    // 大文字小文字を維持する複雑な置換は省略し、一律にgoodに置換
+                    corrected = corrected.replace(regex, rule.good);
+                    highlights.push(rule.bad);
+                    explanations.push(`- ${rule.exp}`);
+                }
+            });
+
+            // 特に修正対象の単語がない場合
+            if (highlights.length === 0) {
+                return {
+                    original: text,
+                    corrected: text,
+                    explanation: "Excellent! Your English is already natural and easy to understand.",
+                    highlights: []
+                };
+            }
+
+            return {
+                original: text,
+                corrected: corrected,
+                explanation: explanations.join("<br>"),
+                highlights: highlights
+            };
+        }
+
+        // Check English ボタン処理
+        document.getElementById("btnCheck").addEventListener("click", async () => {
+            const text = editor.value;
+            if (!text.trim()) {
+                alert("Please write some text first!");
+                return;
+            }
+
+            // UI切り替え (ロード中表示)
+            document.getElementById("aiPlaceholder").style.display = "none";
+            document.getElementById("aiContent").style.display = "none";
+            document.getElementById("loading").style.display = "block";
+            
+            try {
+                // API関数呼び出し
+                const result = await fetchAICorrectionAPI(text);
+                
+                // 結果の反映
+                document.getElementById("origText").textContent = result.original;
+                document.getElementById("corrText").textContent = result.corrected;
+                document.getElementById("expText").innerHTML = result.explanation;
+                
+                // エディタ側へのハイライト指示
+                aiHighlightWords = result.highlights;
+                updateView();
+
+                // UI切り替え (結果表示)
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("aiContent").style.display = "block";
+            } catch (error) {
+                alert("Failed to check English.");
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("aiPlaceholder").style.display = "block";
+            }
+        });
+
+        // AIの修正内容をエディタに適用するボタン
+        document.getElementById("btnApply").addEventListener("click", () => {
+            const correctedText = document.getElementById("corrText").textContent;
+            if(correctedText) {
+                editor.value = correctedText;
+                aiHighlightWords = []; // 修正適用後はハイライトを消す
+                saveHistory();
+                updateView();
+                
+                // UIリセット
+                document.getElementById("aiContent").style.display = "none";
+                document.getElementById("aiPlaceholder").style.display = "block";
+            }
+        });
+
+        // =========================================
+        // 初期化処理
+        // =========================================
+        window.onload = () => {
+            resetHistory();
+            updateView();
+            // 初期テスト用にわざと間違った文章を入れることも可能です
+            // editor.value = "I is a student. English is very difficult.";
+            // saveHistory();
+            // updateView();
+        };
+
+    </script>
 </body>
 </html>
