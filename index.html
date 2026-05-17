@@ -248,7 +248,7 @@
                 return;
             }
 
-            const apiKey = ''; 
+            const apiKey = window.process?.env?.NEXT_PUBLIC_NVIDIA_API_KEY || '';
             const endpoint = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
             try {
